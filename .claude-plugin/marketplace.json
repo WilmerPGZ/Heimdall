@@ -1,0 +1,14 @@
+{
+  "name": "heimdall",
+  "description": "Catálogo de plugins para copilotos de informe radiológico.",
+  "owner": {
+    "name": "heimdall"
+  },
+  "plugins": [
+    {
+      "name": "radiologia-informes",
+      "source": "./plugins/radiologia-informes",
+      "description": "Verificador determinista del informe y Fábrica de KB con su linter."
+    }
+  ]
+}

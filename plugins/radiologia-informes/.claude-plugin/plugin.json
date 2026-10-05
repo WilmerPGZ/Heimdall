@@ -1,0 +1,10 @@
+{
+  "name": "radiologia-informes",
+  "displayName": "Radiología · informes",
+  "version": "1.0.1",
+  "description": "Verificador determinista del informe radiológico y Fábrica de KB con su linter, para cuatro copilotos de informe (Claude RADS, NeuroRadio, RM de cuerpo, MSK).",
+  "author": {
+    "name": "heimdall"
+  },
+  "license": "Proprietary"
+}
