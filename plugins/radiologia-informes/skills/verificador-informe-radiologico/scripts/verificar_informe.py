@@ -93,6 +93,7 @@ def numeros(texto):
     sin_marcadores = re.sub(r"\[[^\]]*\]", " ", texto)
     sin_marcadores = re.sub(r"\b\d{1,3}(?:\.\d{3}){2,}\b|\b\d{6,}\b", " ", sin_marcadores)  # v1.5: documentos y teléfonos nunca se comparan ni se imprimen
     sin_marcadores = re.sub(r"(?m)^\s*\d+[.)]\s", " ", sin_marcadores)  # numeración de la Opinión
+    sin_marcadores = re.sub(r"(?<=[:.]\s)\d{1,2}[.)]\s", " ", sin_marcadores)  # v1.7: numeración pegada en una sola línea («Opinión: 1. … 2. …»)
     sin_marcadores = re.sub(r"\b[\w-]*RADS\s+\d+\w*(?:/[\w+]+)*", " ", sin_marcadores)  # v1.4: categoría derivada
     return {n.replace(",", ".") for n in NUM.findall(sin_marcadores)}
 

@@ -3,7 +3,7 @@ name: fabrica-kb-radiologia
 description: Builds, patches, migrates and audits knowledge-base files (KB, SYS, TRANSVERSAL, CORE) for radiology report copilots under the KB standard v2.1, and harvests the radiologist's corrections into rules. Use for /kb work, new topic files, fixes, v1→v2 or v2.1 migration, pruning a full project, redundancy checks, lesson harvest or library sync.
 ---
 
-# Fábrica de KB · copilotos de radiología (v1.4 · 2026-10-05)
+# Fábrica de KB · copilotos de radiología (v1.5 · 2026-10-05)
 
 The four copilots (Claude RADS, NeuroRadio, RM de cuerpo, MSK) answer the radiologist in Spanish. In chat they do NOT see their project files as a folder: they read them with the project-knowledge search, one query per need («<logical file name> <section or entity>»), and each project's trigger table (`despacho-<proyecto>`) lives at the end of the Δ1 of its instructions, not as a file. This skill holds the rules for writing those files, so the instructions do not carry them in every turn. Talk to the radiologist in Spanish; you may reason in English.
 
@@ -11,7 +11,7 @@ The four copilots (Claude RADS, NeuroRadio, RM de cuerpo, MSK) answer the radiol
 - Standard: `RADS/04 KB Markdown/_homogeneizacion/core/estandar-kb-v2.1.md` (search-ready rules: self-contained fichas, card index, retrieval test, v2.0→v2.1 migration) on top of `core/estandar-kb-v2.md` (subtypes) and `RADS/04 KB Markdown/estandar-kb-radiologia-v1.1.md` (§0 rules, §2 names, §3–§5 anatomy, §7 markers, §12 linter, §14 template). Read both before building.
 - Tools in this skill's `scripts/` (run them, never reimplement): `migrar_kb_v21.py` (mechanical v2.0→v2.1 migration, idempotent; `--compacto` when the project is full: Contexto without description, Índice instead of «Posee», Fuentes without pages, changelog and [NF]-only gap lines to disk; `--check` = the v2.1 linter rules CTX, RET-P, SIZE, IDX, TAB plus missing Dictado/Keywords and example Opiniones that open with a certainty term) · `redundancia_kb.py` (report only: overlapping files, twin fichas, small files, orphans; merge only when it saves real space, because a merge breaks dispatch rows and pointers).
 - Linter: `scripts/lint_kb.py` in this skill (the RADS copy `_tools/lint_kb.py` is the same script with its file list built in) — run it, do not reimplement it: `python3 scripts/lint_kb.py ARCHIVO_O_CARPETA --known <lista>`. The list of known file names is private and lives outside the plugin (`_tools/lint_known_<proyecto>.txt` in the RADS folder); in Cowork the RADS copy `_tools/lint_kb.py` already carries it; in a chat, build the list from `project_info`.
-- Shared core and files: `_homogeneizacion/core/` (núcleo común v1.4, alcance, estándar, lecciones, manual) and `compartidos/` (terminology, shared KBs, `verificar_informe.py`; `buscar_kb.py` works only on a disk copy of a project). A shared file is edited there and copied identically to every project that uses it.
+- Shared core and files: `_homogeneizacion/core/` (núcleo común v1.5, alcance, estándar, lecciones, manual) and `compartidos/` (terminology, shared KBs, `verificar_informe.py`; `buscar_kb.py` works only on a disk copy of a project). A shared file is edited there and copied identically to every project that uses it.
 - Scope table: `core/alcance-comun-v1.md` decides which project owns a topic (CT spine → Claude RADS; other spine → NeuroRadio; MSK has no spine; a neck mass with supraclavicular epicenter stays in NeuroRadio).
 - Lessons: `core/lecciones-comunes.md` (every past correction → its rule → its eval). Certainty scale: report manual §V.2–V.3.
 - RM de cuerpo only: locate sources in `claude/indice-literatura-rm-fisica.md` and cite in Vancouver from its §1.
@@ -36,6 +36,15 @@ Take files in the priority order of the project's `migracion-v2.md`. For files t
 - Patch in its current skeleton; superseded text moves to the retired-versions section, never mixed with current content.
 - Retired certainty terms are lexicon, not clinical content: replace them per manual §V.2–V.3 and log `[W AAAA-MM-DD]` in the changelog.
 - Never change a criterion, threshold, figure or citation without a source.
+
+## Maintenance principles (why the rules above exist)
+- Chesterton's fence: never remove a rule, template line or file before you find why it is there (decisions log, lessons, changelog); if no reason exists, propose the removal, do not do it.
+- Goodhart's law: the linter, the checker, word budgets and the retrieval score are proxies; never tune a file to pass them at the cost of what a report needs.
+- Parkinson's law: text grows to fill the space it is given; every addition to an instruction or a ficha names what it replaces, and the size is measured before and after.
+- Pareto: fix first the errors that recur in the radiologist's corrections and the files that the trigger tables hit most.
+- Brooks's law: more files, skills or parallel tasks do not speed up a late fix; they add coordination (one writer per project, below).
+- Peter principle: a rule or file promoted outside the context it was proven in fails there; keep its condition and its owner project.
+- Hofstadter's law: budget migrations and batches at about twice the first estimate, and stage them so each step is useful on its own.
 
 ## One writer per project
 Before rewriting files in a project, compare `project_info` with the last manifest; never run two writing tasks on the same project at the same time (a parallel batch moved files mid-task on 2026-10-05).
