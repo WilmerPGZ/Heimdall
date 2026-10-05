@@ -17,7 +17,7 @@ V=/tmp/verificar_informe.py; [ -s "$V" ] || sed -n '/^#BEGIN_SCRIPT$/,/^#END_SCR
 The first call of a conversation extracts the script to `/tmp`; later calls reuse it. Output: «OK · sin alertas» or one alert per line. Resolve every alert: fix it, or keep it and declare why. If the command finds no script, say so in block 3 and check by hand.
 
 ## Source of truth
-`RADS/04 KB Markdown/_homogeneizacion/compartidos/verificar_informe.py`. When it changes, this skill is updated with the identical text. v1.2: markers like `[COMPLETAR: lado]` no longer trigger the colon or measurement alerts in the Opinión. v1.3: a decimal point at the end of a sentence («1.2.») is caught; body words added to the accent list (relación, ventrículo, hepático, esplénico, sistólico, diastólico…). v1.4: «RM … simple» and «RM de cráneo» are flagged; equivalent negations («no hay», «no se identifica», «sin evidencia de», «sin») count once and «sin contraste» is technique, not a negation; RADS category numbers («PE-RADS 3/RV+») no longer count as new figures. v1.5: ID and phone numbers («1.234.567», six or more digits) are never compared or printed, so a removed identifier never reappears in an alert. v1.6: PROCEDIMIENTO alert when a «Se sugiere» sentence names a procedure outside the N9 form (dictated → keep the intent and declare it), and UNIDAD alert when a unit of the draft disappears from the output (declare it; never convert). v1.7: narrative voice (core v1.4) — ORDEN alert when an Opinión idea opens with a certainty term, VOZ alerts for a verbless noun after a comma («, compresión de») and for filler («a nivel de», «presencia de», «que corresponda a»).
+`RADS/04 KB Markdown/_homogeneizacion/compartidos/verificar_informe.py`. When it changes, this skill is updated with the identical text. v1.2: markers like `[COMPLETAR: lado]` no longer trigger the colon or measurement alerts in the Opinión. v1.3: a decimal point at the end of a sentence («1.2.») is caught; body words added to the accent list (relación, ventrículo, hepático, esplénico, sistólico, diastólico…). v1.4: «RM … simple» and «RM de cráneo» are flagged; equivalent negations («no hay», «no se identifica», «sin evidencia de», «sin») count once and «sin contraste» is technique, not a negation; RADS category numbers («PE-RADS 3/RV+») no longer count as new figures. v1.5: ID and phone numbers («1.234.567», six or more digits) are never compared or printed, so a removed identifier never reappears in an alert. v1.6: PROCEDIMIENTO alert when a «Se sugiere» sentence names a procedure outside the N9 form (dictated → keep the intent and declare it), and UNIDAD alert when a unit of the draft disappears from the output (declare it; never convert). v1.7: narrative voice (core v1.4) — ORDEN alert when an Opinión idea opens with a certainty term, VOZ alerts for a verbless noun after a comma («, compresión de») and for filler («a nivel de», «presencia de», «que corresponda a»); ORDEN stays quiet when Hallazgos carries the same existence hedge («posible nódulo»).
 
 ```python
 #BEGIN_SCRIPT
@@ -178,7 +178,10 @@ def main():
         for idea in ideas:
             cuerpo = re.sub(r"^\d+[.)]\s*", "", idea)
             texto = re.sub(r"\[[^\]]*\]", "", cuerpo)  # v1.2: los marcadores no cuentan
-            if CERTEZA_INICIAL.match(texto.strip()):
+            mc = CERTEZA_INICIAL.match(texto.strip())
+            sig = re.match(r"\S+\s+(\w+)", texto.strip())
+            duda_existencia = bool(mc and sig and re.search(r"\b(posibles?|probables?|parece|aparente)\s+(un[ao]?\s+)?" + re.escape(sig.group(1)), hall, re.I))
+            if mc and not duda_existencia:
                 alertas.append(f"ORDEN · la idea abre con el término de certeza: abre con el hallazgo cierto y pon el término sobre el diagnóstico («Masa hepática, sospechosa de colangiocarcinoma»); se conserva solo si Hallazgos duda de la existencia del hallazgo · «{cuerpo[:60]}»")
             if ":" in texto:
                 alertas.append(f"OPINIÓN · dos puntos en una idea · «{cuerpo[:60]}»")

@@ -155,7 +155,10 @@ def main():
         for idea in ideas:
             cuerpo = re.sub(r"^\d+[.)]\s*", "", idea)
             texto = re.sub(r"\[[^\]]*\]", "", cuerpo)  # v1.2: los marcadores no cuentan
-            if CERTEZA_INICIAL.match(texto.strip()):
+            mc = CERTEZA_INICIAL.match(texto.strip())
+            sig = re.match(r"\S+\s+(\w+)", texto.strip())
+            duda_existencia = bool(mc and sig and re.search(r"\b(posibles?|probables?|parece|aparente)\s+(un[ao]?\s+)?" + re.escape(sig.group(1)), hall, re.I))
+            if mc and not duda_existencia:
                 alertas.append(f"ORDEN · la idea abre con el término de certeza: abre con el hallazgo cierto y pon el término sobre el diagnóstico («Masa hepática, sospechosa de colangiocarcinoma»); se conserva solo si Hallazgos duda de la existencia del hallazgo · «{cuerpo[:60]}»")
             if ":" in texto:
                 alertas.append(f"OPINIÓN · dos puntos en una idea · «{cuerpo[:60]}»")
