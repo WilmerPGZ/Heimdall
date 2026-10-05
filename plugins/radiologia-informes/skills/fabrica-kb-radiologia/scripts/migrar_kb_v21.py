@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""migrar_kb_v21.py · v1.1 (2026-10-05) · migración mecánica estándar KB v2.0 → v2.1 (pasos 1–4 de §7).
+"""migrar_kb_v21.py · v1.2 (2026-10-05) · migración mecánica estándar KB v2.0 → v2.1 (pasos 1–4 de §7).
 
 Uso:
   python3 migrar_kb_v21.py ENTRADA SALIDA RETIRADO --proyecto MSK      # migra una carpeta de .md
@@ -12,6 +12,9 @@ Qué hace (idempotente):
   --compacto (proyecto lleno): Contexto sin descripción (la entidad ya está en el título del mismo fragmento),
   Índice en una línea en lugar de «Posee», Fuentes sin capítulos, páginas ni fechas de consulta (las páginas siguen
   en cada ficha), changelog reducido a la línea «en disco», líneas solo-[NF] de «Vacíos» al disco ([TENSION] se queda). El total debe bajar; `_orden-subida.txt` ordena la subida del que más ahorra al que crece.
+  --limpieza (recomendado tras el piloto MSK 2026-10-05): SOLO lo que no compite en la búsqueda —
+  Fuentes sin capítulos ni páginas, changelog a disco, líneas solo-[NF] de «Vacíos» a disco, línea REVISOR fuera.
+  No toca Contexto, títulos, «Posee» ni agrega Índice (el Índice en la tarjeta le quitó fichas a la búsqueda: 11→7/20).
   No toca contenido clínico. Lo que pide revisión (fichas >600 tokens, tablas >8 filas, sin Dictado o Keywords,
   Opinión de ejemplo que abre con certeza) va al informe JSON y a la consola.
 """
@@ -82,7 +85,9 @@ def revisar(lineas, slug, nombre):
     rep["IDX"] = "ok" if tiene_idx else "falta"
     return rep
 
-def migrar(texto, nombre, proyecto, compacto=False):
+def migrar(texto, nombre, proyecto, compacto=False, limpieza=False):
+    if limpieza:
+        compacto = True
     L = texto.split("\n")
     slug = slug_de(L, nombre)
     retirado = []
@@ -113,7 +118,7 @@ def migrar(texto, nombre, proyecto, compacto=False):
         else:
             k += 1
     # 1 · Contexto y slug en el título
-    for i, j, n, t in reversed(fichas(L)):
+    for i, j, n, t in ([] if limpieza else reversed(fichas(L))):
         if not t.endswith(slug):
             L[i] = f"## {n} · {t} · {slug}"
         if not (i + 1 < len(L) and L[i + 1].startswith("> Contexto:")):
@@ -144,6 +149,10 @@ def migrar(texto, nombre, proyecto, compacto=False):
                         else f"> Contexto: {slug} · {modalidad} · {proyecto} · {desc} · dispara: {dispara}")
     # 4 · REVISOR fuera de la tarjeta · 2 · Índice
     card = next((i for i, l in enumerate(L) if l.startswith("## 0 · Tarjeta")), None)
+    if limpieza and card is not None:
+        fin = next((i for i in range(card + 1, len(L)) if H_SEC.match(L[i])), len(L))
+        L[card + 1:fin] = [l for l in L[card + 1:fin] if not l.startswith("- **REVISOR:**")]
+        card = None
     if card is not None:
         fin = next((i for i in range(card + 1, len(L)) if H_SEC.match(L[i])), len(L))
         nueva = []
@@ -181,11 +190,17 @@ def migrar(texto, nombre, proyecto, compacto=False):
             if H_SEC.match(l):
                 en_fuentes = bool(re.match(r"^## \d+ · Fuentes", l))
                 continue
-            if en_fuentes and re.match(r"^- \*\*S\d+:\*\*", l):
-                c = re.sub(r",?\s*cap\.\s.*?(?=\s·\s|$)", "", l)
-                c = re.sub(r",?\s*pp?\.\s[\d–\-, ]+(\s*\(PDF[^)]*\))?", "", c)
-                c = re.sub(r"\s*·\s*(libro|consultado [\d-]+|verificado [\d-]+[^·]*)", "", c)
-                L[i] = re.sub(r"\s*·\s*", " · ", c).rstrip(" ,;·")
+            m0 = re.match(r"^(- \*\*S\d+:\*\*\s*)(.*)$", l) if en_fuentes else None
+            if m0:
+                cuerpo = m0.group(2)
+                stop = re.search(r"\s*[,·;]\s*(caps?\.|pp?\.\s|PDF|folios?\b|consultad|libro\b|verificad|sin DOI)", cuerpo)
+                corto = cuerpo[:stop.start()] if stop else cuerpo
+                doi = re.search(r"DOI\s+(10\.\S+?)(?=[\s·;,)]|$)", cuerpo)
+                if doi and doi.group(1) not in corto:
+                    corto += f" · DOI {doi.group(1)}"
+                if re.search(r"solo resumen", cuerpo) and "solo resumen" not in corto:
+                    corto += " · solo resumen"
+                L[i] = m0.group(1) + corto.rstrip(" ,;·")
     return "\n".join(L), slug, retirado
 
 def main():
@@ -215,8 +230,8 @@ def main():
         if "## 0 · Tarjeta" not in t:
             print(f"SALTO (sin tarjeta, migración completa en Fábrica) · {n}")
             continue
-        nuevo, slug, retirado = migrar(t, n, proyecto, "--compacto" in a)
-        if "--compacto" in a and len(nuevo.split()) > len(t.split()):
+        nuevo, slug, retirado = migrar(t, n, proyecto, "--compacto" in a, "--limpieza" in a)
+        if ("--compacto" in a or "--limpieza" in a) and len(nuevo.split()) > len(t.split()):
             print(f"CRECE · {n} · {len(t.split())} → {len(nuevo.split())} palabras (súbelo al final)")
         open(os.path.join(sal, n), "w", encoding="utf-8").write(nuevo)
         if retirado:
