@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""verificar_informe.py · v1.6 (2026-10-05) · archivo compartido idéntico en los 4 copilotos.
+"""verificar_informe.py · v1.7 (2026-10-05) · archivo compartido idéntico en los 4 copilotos.
 
 Chequeo determinista del bloque 1 antes de emitirlo. No corrige: lista ALERTAS para que el modelo
 las resuelva (corregir o declarar). Se ejecuta, no se lee: su texto no entra al contexto.
@@ -69,6 +69,12 @@ MEDIDA = re.compile(r"\d+(?:[.,]\d+)?\s*(mm|cm|cc|ml|mL|UH|%|kPa)\b")
 CATEGORIA = re.compile(r"\b(RADS|AAST|SINS|AO|FIGO|TNM|Bosniak|Fleischner|Fardon|ASPECTS|Spetzler|Fisher|Weber|Garden|Schatzker|Salter|Neer|Gleason|grado|tipo|nivel)\b", re.I)
 
 
+# v1.7 · voz narrativa (núcleo v1.4, N6–N8)
+CERTEZA_INICIAL = re.compile(r"^(probables?|posibles?|posiblemente|probablemente|sospech\w*|sugestiv\w*|consistentes?|hallazgos (sugestivos|sospechosos|consistentes|en relaci[oó]n))\b", re.I)
+NOMINAL = re.compile(r",\s*(compresi[oó]n|desplazamiento|contacto|obliteraci[oó]n|borramiento|infiltraci[oó]n|invasi[oó]n|estenosis)\s+(de|del|sobre|con)\b", re.I)
+RELLENO = re.compile(r"\b(a nivel de(l)?|presencia de|de tipo|llama la atenci[oó]n|cabe (anotar|destacar|resaltar)|que corresponda a)\b", re.I)
+
+
 def norm(s):
     return unicodedata.normalize("NFC", s)
 
@@ -131,6 +137,12 @@ def main():
         if correcta:
             alertas.append(f"TILDE · «{palabra}» → «{correcta}»")
 
+    # v1.7: voz narrativa
+    for m in NOMINAL.finditer(salida):
+        alertas.append(f"VOZ · sustantivo tras coma donde va un verbo («que comprime», «que desplaza»; nunca un verbo más fuerte que el dictado) · «{m.group(0).strip(', ')}»")
+    for m in RELLENO.finditer(salida):
+        alertas.append(f"VOZ · relleno («a nivel de» → «en»; los demás se eliminan), salvo texto fijo de plantilla · «{m.group(0)}»")
+
     # v1.6: procedimiento recomendado fuera de la forma de N9
     for frase in re.split(r"(?<=[.])\s+|\n", salida):
         if re.search(r"\bse sugiere\b", frase, re.I) and PROC.search(frase) and not re.search(r"guiad[ao]s? por|centro de referencia de sarcoma", frase, re.I):
@@ -143,6 +155,8 @@ def main():
         for idea in ideas:
             cuerpo = re.sub(r"^\d+[.)]\s*", "", idea)
             texto = re.sub(r"\[[^\]]*\]", "", cuerpo)  # v1.2: los marcadores no cuentan
+            if CERTEZA_INICIAL.match(texto.strip()):
+                alertas.append(f"ORDEN · la idea abre con el término de certeza: abre con el hallazgo cierto y pon el término sobre el diagnóstico («Masa hepática, sospechosa de colangiocarcinoma»); se conserva solo si Hallazgos duda de la existencia del hallazgo · «{cuerpo[:60]}»")
             if ":" in texto:
                 alertas.append(f"OPINIÓN · dos puntos en una idea · «{cuerpo[:60]}»")
             for m in MEDIDA.finditer(texto):
