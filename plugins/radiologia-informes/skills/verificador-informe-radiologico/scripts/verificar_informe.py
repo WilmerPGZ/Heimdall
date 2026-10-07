@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""verificar_informe.py · v1.7 (2026-10-05) · archivo compartido idéntico en los 4 copilotos.
+"""verificar_informe.py · v1.8 (2026-10-05) · archivo compartido idéntico en los 4 copilotos.
 
 Chequeo determinista del bloque 1 antes de emitirlo. No corrige: lista ALERTAS para que el modelo
 las resuelva (corregir o declarar). Se ejecuta, no se lee: su texto no entra al contexto.
@@ -102,6 +102,7 @@ def negaciones(texto):
     """v1.4: «no hay X», «no se identifica X», «sin evidencia de X», «sin signos de X» y «sin X» cuentan como UNA negación."""
     t = re.sub(r"\bno\s+(hay|se\s+(identifica|identifican|observa|observan|evidencia|evidencian|visualiza|visualizan|aprecia|aprecian)|presenta|presentan|muestra|muestran)\b", " NEG ", texto, flags=re.I)
     t = re.sub(r"\bsin\s+(medio\s+de\s+)?contraste\b", " ", t, flags=re.I)  # técnica, no hallazgo
+    t = re.sub(r"\bsin\s+relaci[oó]n\s+con\s+(el|la)\s+\w+(\s+agud[oa])?\b", " ", t, flags=re.I)  # v1.8: cierre de Hickam (N7), no es un hallazgo negativo
     t = re.sub(r"\bsin\s+(evidencia|signos|imagen|im[aá]genes)\s+de\b", " NEG ", t, flags=re.I)
     t = re.sub(r"\b(sin|no)\b", " NEG ", t, flags=re.I)
     return len(re.findall(r"\bNEG\b", t))
@@ -123,8 +124,8 @@ def main():
         alertas.append(f"PERCEPCIÓN · verbo de percepción en Hallazgos (salvo texto fijo de plantilla, declarado) · «{m.group(0)}»")
 
     for m in re.finditer(r"\[[^\]]*\]", salida):
-        if not MARCADOR_OK.match(m.group(0)):
-            alertas.append(f"MARCADOR · fuera del vocabulario del bloque 1 (N2) · «{m.group(0)}»")
+        if True:  # v1.8: el bloque 1 no lleva corchetes (núcleo N2 v1.8); la duda va al aviso «Antes de pegar»
+            alertas.append(f"MARCADOR · el bloque 1 no lleva corchetes: corrígelo o súbelo al aviso «Antes de pegar» (N2) · «{m.group(0)}»")
 
     for m in re.finditer(r"(?<![\w.])\d+\.\d+(?!\w|\.\d)", salida):  # v1.3: también al final de frase
         alertas.append(f"DECIMAL · usar coma decimal (salvo texto fijo de plantilla) · «{m.group(0)}»")
@@ -137,6 +138,17 @@ def main():
         correcta = TILDES.get(palabra.lower())
         if correcta:
             alertas.append(f"TILDE · «{palabra}» → «{correcta}»")
+
+    # v1.8: variedad léxica en Hallazgos (N6)
+    n_hay = len(re.findall(r"\bhay\b", hall, re.I))
+    if n_hay > 2:
+        alertas.append(f"REPETICIÓN · «hay» aparece {n_hay} veces en Hallazgos (máximo 2): usa el verbo que dice qué hace o qué es el hallazgo (N6)")
+    primeras = [re.findall(r"\w+", l.lower())[:1] for l in hall.splitlines() if re.search(r"\w", l)]
+    primeras = [x[0] for x in primeras if x]
+    for i in range(len(primeras) - 2):
+        if primeras[i] == primeras[i + 1] == primeras[i + 2] and primeras[i] not in ("el", "la", "los", "las"):
+            alertas.append(f"REPETICIÓN · tres hallazgos seguidos abren con «{primeras[i]}» (N6)")
+            break
 
     # v1.7: voz narrativa
     for m in NOMINAL.finditer(salida):
@@ -153,7 +165,7 @@ def main():
         ideas = [l.strip() for l in opin.splitlines() if l.strip() and not l.strip().startswith("[")]
         if len(ideas) > 4:
             alertas.append(f"OPINIÓN · {len(ideas)} ideas (tope 3, o 4 en politrauma u oncología multiorgánica)")
-        for idea in ideas:
+        for k, idea in enumerate(ideas):
             cuerpo = re.sub(r"^\d+[.)]\s*", "", idea)
             texto = re.sub(r"\[[^\]]*\]", "", cuerpo)  # v1.2: los marcadores no cuentan
             mc = CERTEZA_INICIAL.match(texto.strip())
@@ -166,15 +178,16 @@ def main():
             for m in MEDIDA.finditer(texto):
                 alertas.append(f"OPINIÓN · medida en la Opinión (solo si el tamaño ES el criterio o es excepción del delta) · «{m.group(0)}»")
             n = len(cuerpo.split())
-            if n > 40:
-                alertas.append(f"OPINIÓN · idea de {n} palabras (tope 25; compleja 40) · «{cuerpo[:50]}…»")
+            tope = 80 if k == 0 else 40  # v1.8: la idea 1 es prosa integrada (N7 v1.7: ≤60, compleja ≤80)
+            if n > tope:
+                alertas.append(f"OPINIÓN · idea de {n} palabras (tope: idea 1 ≤80, resto ≤40) · «{cuerpo[:50]}…»")
         lados_h = {s.lower()[:5] for s in SIDE.findall(hall) for s in [s[0] if isinstance(s, tuple) else s]}
         opin_lado = re.sub(r"\b(ventr[ií]culo|aur[ií]cula|coraz[oó]n|cavidades)\s+(derech|izquierd)\w*", " ", opin, flags=re.I)
         for m in SIDE.finditer(opin_lado):
             if "[VERIFICAR LADO]" in opin_lado[m.end():m.end() + 25]:
                 continue
             if m.group(1).lower()[:5] not in lados_h:
-                alertas.append(f"LADO · «{m.group(1)}» en la Opinión no aparece en Hallazgos → [VERIFICAR LADO]")
+                alertas.append(f"LADO · «{m.group(1)}» en la Opinión no aparece en Hallazgos → corrígelo si el borrador lo resuelve; si no, aviso «Antes de pegar» (N2)")
 
     if borrador is not None:
         nb, ns = numeros(borrador), numeros(salida)
@@ -187,8 +200,9 @@ def main():
             return {{"ml": "mL", "HU": "UH", "mm2/s": "mm²/s"}.get(u, u) for u in UNIDAD.findall(t)}
         for u in sorted(unidades(borrador) - unidades(salida)):
             alertas.append(f"UNIDAD · «{u}» del borrador no aparece en la salida: declara el cambio (nunca conviertas unidades salvo excepción del delta)")
-        neg_b = negaciones(borrador)
-        neg_s = negaciones(salida)
+        hall_b, _ = secciones(borrador)
+        neg_b = negaciones(hall_b if hall_b.strip() else borrador)  # v1.8: se comparan Hallazgos; «Sin signos de…» en la Opinión responde la indicación
+        neg_s = negaciones(hall)
         if neg_s > neg_b:
             alertas.append(f"NEGACIÓN · la salida tiene {neg_s - neg_b} negación(es) más que el borrador: confirma que ninguna es un negativo no dictado")
 
