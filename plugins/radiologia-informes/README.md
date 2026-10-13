@@ -4,7 +4,7 @@ Kit para cuatro copilotos de informe radiológico en Claude (Claude RADS, NeuroR
 
 ## Qué trae
 
-- **verificador-informe-radiologico**: chequeo determinista que las instrucciones de los copilotos corren antes de emitir cada informe (términos retirados, verbos de percepción, marcadores, decimales, tildes, ideas de la Opinión, lado, cifras, negaciones, procedimientos fuera de forma y cambios de unidad). El script está en `scripts/verificar_informe.py` y también dentro del SKILL.md.
+- **verificador-informe-radiologico**: chequeo determinista que las instrucciones de los copilotos corren antes de emitir cada informe (términos retirados, verbos de percepción, marcadores, decimales, tildes, ideas de la Opinión con criterio (descriptor sin diagnóstico, «en el contexto de», frase copiada de Hallazgos, opciones con «/»), variantes `/alt`, lado, cifras, negaciones, procedimientos fuera de forma, cambios de unidad, rótulos de bloques auxiliares, siglas sueltas y rangos imposibles de UH o porcentaje). El script está en `scripts/verificar_informe.py` y también dentro del SKILL.md. Las pruebas (62) están en `tests/`.
 - **fabrica-kb-radiologia**: reglas para construir, parchear y migrar archivos de conocimiento con el estándar KB v2.1 (voz narrativa del núcleo v1.4), con su linter (`scripts/lint_kb.py`), la migración mecánica a v2.1 con modo compacto para proyectos llenos (`scripts/migrar_kb_v21.py`) y el informe de redundancia (`scripts/redundancia_kb.py`).
 - **evaluar-copiloto**: pruebas de regresión simuladas de una instrucción con subagentes (solo en Cowork), con calificación PASA / PARCIAL / FALLA. Los casos de prueba viven fuera del plugin.
 
