@@ -3,7 +3,7 @@ name: "verificador-informe-radiologico"
 description: "Holds the deterministic report checker used by four radiology report copilots (Claude RADS, NeuroRadio, RM de cuerpo, MSK). Their instructions extract and run it with one bash command before emitting block 1."
 ---
 
-# Verificador del informe radiológico · v1.9 (2026-10-11)
+# Verificador del informe radiológico · v2.2 (2026-10-22)
 
 The copilots' project files are no longer mounted as a folder in chat (checked 2026-10-04: no `/mnt/project`), but account and plugin skills are (under `/mnt/skills`; this one ships in the plugin `radiologia-informes`, with the same script also in `scripts/verificar_informe.py`). This skill only stores the checker; nothing here needs to be read into context.
 
@@ -11,27 +11,40 @@ The copilots' project files are no longer mounted as a folder in chat (checked 2
 Save the proposed block 1 to `/tmp/salida.txt` and the pasted draft to `/tmp/borrador.txt`, then:
 
 ```
-V=/tmp/verificar_informe.py; [ -s "$V" ] || sed -n '/^#BEGIN_SCRIPT$/,/^#END_SCRIPT$/p' "$(find /mnt/skills -path '*verificador-informe-radiologico*' -name SKILL.md 2>/dev/null | head -1)" > "$V"; python3 "$V" /tmp/salida.txt /tmp/borrador.txt
+V=/tmp/verificar_informe.py; [ -s "$V" ] || sed -n '/^#BEGIN_SCRIPT$/,/^#END_SCRIPT$/p' "$(find /mnt/skills -path '*verificador-informe-radiologico*' -name SKILL.md 2>/dev/null | head -1)" > "$V"; python3 "$V" /tmp/salida.txt /tmp/borrador.txt [--extension 1|2|3] [--bloque3 /tmp/b3.txt]
 ```
 
 The first call of a conversation extracts the script to `/tmp`; later calls reuse it. Output: «OK · sin alertas» or one alert per line. With `/alt`, put both Opiniones in the same file under the plain lines «Opinión · sobria» and «Opinión · asertiva»: one run checks each one separately and prefixes its alerts with `[sobria]` or `[asertiva]` (or run it once per version). Resolve every alert: fix it, or keep it and declare why. If the command finds no script, say so in block 3 and check by hand.
 
 ## Source of truth
-`RADS/04 KB Markdown/_homogeneizacion/compartidos/verificar_informe.py`. When it changes, this skill is updated with the identical text. v1.2: markers like `[COMPLETAR: lado]` no longer trigger the colon or measurement alerts in the Opinión. v1.3: a decimal point at the end of a sentence («1.2.») is caught; body words added to the accent list (relación, ventrículo, hepático, esplénico, sistólico, diastólico…). v1.4: «RM … simple» and «RM de cráneo» are flagged; equivalent negations («no hay», «no se identifica», «sin evidencia de», «sin») count once and «sin contraste» is technique, not a negation; RADS category numbers («PE-RADS 3/RV+») no longer count as new figures. v1.5: ID and phone numbers («1.234.567», six or more digits) are never compared or printed, so a removed identifier never reappears in an alert. v1.6: PROCEDIMIENTO alert when a «Se sugiere» sentence names a procedure outside the N9 form (dictated → keep the intent and declare it), and UNIDAD alert when a unit of the draft disappears from the output (declare it; never convert). v1.7: narrative voice (core v1.4) — ORDEN alert when an Opinión idea opens with a certainty term, VOZ alerts for a verbless noun after a comma («, compresión de») and for filler («a nivel de», «presencia de», «que corresponda a»); ORDEN stays quiet when Hallazgos carries the same existence hedge («posible nódulo»); Opinión numbering pasted on one line («Opinión: 1. … 2. …») no longer counts as figures. v1.8: idea 1 of the Opinión may reach 80 words (integrated prose); «sin relación con el cuadro» is not a negation; negations are compared within Hallazgos; any bracket in block 1 is an alert; REPETICIÓN alerts for «hay» over twice and three findings opening with the same word. v1.9 (instruction v2.0, core v2.2): prose in the Opinión is no longer penalized — an idea is a paragraph (or a numbered line), the idea-count alert fires only above 5, and the word limits (idea 1 ≤100, the rest ≤50) are signals; new Opinión alerts for an idea that opens with a descriptor and names no diagnosis, «en el contexto de» with no answer, a sentence copied from Hallazgos and two options joined by «/»; BLOQUE alert for block 2–4 lines inside block 1 («Descripción: … →», «Faltó:», «Considerar añadir», «Antes de pegar», «Lección:», «Firmante:», «→ Maestro:»…); SIGLA alert for an isolated 3–5 capital token opening block 1 (a signer's sigla); RANGO alert for UH outside −1100…4000 or a percentage above 100; «Opinión · sobria» / «Opinión · asertiva» labels; the old `[VERIFICAR LADO]` exception is gone. Tests: `tests/test_verificar_v19.py` (`python3 -m unittest discover -s tests`).
+`RADS/04 KB Markdown/_homogeneizacion/compartidos/verificar_informe.py`. When it changes, this skill is updated with the identical text. v1.2: markers like `[COMPLETAR: lado]` no longer trigger the colon or measurement alerts in the Opinión. v1.3: a decimal point at the end of a sentence («1.2.») is caught; body words added to the accent list (relación, ventrículo, hepático, esplénico, sistólico, diastólico…). v1.4: «RM … simple» and «RM de cráneo» are flagged; equivalent negations («no hay», «no se identifica», «sin evidencia de», «sin») count once and «sin contraste» is technique, not a negation; RADS category numbers («PE-RADS 3/RV+») no longer count as new figures. v1.5: ID and phone numbers («1.234.567», six or more digits) are never compared or printed, so a removed identifier never reappears in an alert. v1.6: PROCEDIMIENTO alert when a «Se sugiere» sentence names a procedure outside the N9 form (dictated → keep the intent and declare it), and UNIDAD alert when a unit of the draft disappears from the output (declare it; never convert). v1.7: narrative voice (core v1.4) — ORDEN alert when an Opinión idea opens with a certainty term, VOZ alerts for a verbless noun after a comma («, compresión de») and for filler («a nivel de», «presencia de», «que corresponda a»); ORDEN stays quiet when Hallazgos carries the same existence hedge («posible nódulo»); Opinión numbering pasted on one line («Opinión: 1. … 2. …») no longer counts as figures. v1.8: idea 1 of the Opinión may reach 80 words (integrated prose); «sin relación con el cuadro» is not a negation; negations are compared within Hallazgos; any bracket in block 1 is an alert; REPETICIÓN alerts for «hay» over twice and three findings opening with the same word. v1.9 (instruction v2.0, core v2.2): prose in the Opinión is no longer penalized — an idea is a paragraph (or a numbered line), the idea-count alert fires only above 5, and the word limits (idea 1 ≤100, the rest ≤50) are signals; new Opinión alerts for an idea that opens with a descriptor and names no diagnosis, «en el contexto de» with no answer, a sentence copied from Hallazgos and two options joined by «/»; BLOQUE alert for block 2–4 lines inside block 1 («Descripción: … →», «Faltó:», «Considerar añadir», «Antes de pegar», «Lección:», «Firmante:», «→ Maestro:»…); SIGLA alert for an isolated 3–5 capital token opening block 1 (a signer's sigla); RANGO alert for UH outside −1100…4000 or a percentage above 100; «Opinión · sobria» / «Opinión · asertiva» labels; the old `[VERIFICAR LADO]` exception is gone. v2.0: `--extension 1|2|3` (concise, neutral, extended report) with word budgets per level. v2.1: `--bloque3` (proposed block 3): FALTO-DICTADO, FALTO-CLINICO, FALTO-N, LLAMAR-CERTEZA; OPI-NUM1 with a draft. v2.2: PRIVACIDAD comes first — a person's name (with a title, a label, an age, a frequent first name plus surname, the AGFA «SURNAMES, NAMES» form or a name from the draft's signature), an ID document, a record number, a bed or room, a birth date, a phone or a signature in block 1 or block 3; eponyms, the signer's acronym and a dictated communication never alert; the alert names the type and line, never the datum, and every other alert masks it. Tests: `tests/test_verificar_v19.py` and `tests/test_privacidad_v22.py` (`python3 -m unittest discover -s tests`).
 
 ```python
 #BEGIN_SCRIPT
 #!/usr/bin/env python3
-"""verificar_informe.py · v1.9 (2026-10-11) · archivo compartido idéntico en los 4 copilotos.
+"""verificar_informe.py · v2.2 (2026-10-22) · archivo compartido idéntico en los 4 copilotos.
 
 Chequeo determinista del bloque 1 antes de emitirlo. No corrige: lista ALERTAS para que el modelo
 las resuelva (corregir o declarar). Se ejecuta, no se lee: su texto no entra al contexto.
 
-Uso:  python3 verificar_informe.py salida.txt [borrador.txt]
+Uso:  python3 verificar_informe.py salida.txt [borrador.txt] [--extension 1|2|3] [--bloque3 b3.txt]
       (salida = bloque 1 propuesto; borrador = lo que el radiólogo pegó, opcional pero recomendado)
 Sale con código 0 siempre; imprime «OK · sin alertas» o una alerta por línea.
 
 Historial
+v2.2 (2026-10-22) · M0 (P4) · PRIVACIDAD, primera alerta: nombre de persona (con tratamiento, rótulo, edad, nombre frecuente +
+  apellido, formato AGFA «APELLIDOS, NOMBRES» o el nombre que el borrador trae en su firma o en sus rótulos), documento (CC, TI,
+  pasaporte), número de historia, cama o habitación, fecha de nacimiento, teléfono y firma, en el bloque 1 y en el bloque 3. Sin
+  falsos positivos con epónimos, la sigla del firmante ni la comunicación dictada (N11). La alerta nombra el tipo y la línea, nunca
+  el dato; las demás alertas lo enmascaran («‹dato personal›»). Sin datos personales, idéntico a v2.1.
+v2.1 (2026-10-21) · D-238 (r16) · «--bloque3 b3.txt» (bloque 3 propuesto): FALTO-DICTADO (un elemento del «Faltó» ya está
+  en el borrador), FALTO-CLINICO (pide clínica, antecedente, edad o estudio previo: no se ve en la imagen), FALTO-N (más de 3),
+  LLAMAR-CERTEZA (el «Llamar» no copia el diagnóstico y el término de certeza de su idea de la Opinión). Con borrador:
+  OPI-NUM1 (una sola idea con «1.» que el borrador no numera). Sin «--bloque3», idéntico a v2.0 salvo OPI-NUM1.
+v2.0 (2026-10-21) · D-221 · «--extension 1|2|3» (conciso, neutro, extenso): palabras de contenido (sin cifras, unidades ni
+  etiqueta) por oración en Hallazgos (20, 30, 40),
+  oraciones por hallazgo (–, 3, 4), idea 1 de la Opinión (20, 35, 50 palabras), ideas totales sin la recomendación (3, 4, 5);
+  con 1, la línea nominal en Hallazgos no es alerta de VOZ. Sin «--extension», idéntico a v1.9. El anclaje no cambia.
 v1.9 (2026-10-11) · la Opinión en prosa no se castiga: una idea = un párrafo (o una línea numerada),
   alerta solo con >5 ideas, topes 100/50 palabras como señal; nuevos chequeos de la Opinión:
   descriptor sin diagnóstico, «en el contexto de» sin respuesta, frase copiada de Hallazgos, barra
@@ -144,6 +157,167 @@ UH_VALOR = re.compile(r"(?<![\w.,])([-−–]?)(" + MILES + r"|\d+)(?:[.,]\d+)?\
 PCT_VALOR = re.compile(r"(?<![\w.,])(" + MILES + r"|\d+)(?:[.,](\d+))?\s*%")
 
 
+# v2.2 (M0 · P4): PRIVACIDAD, primera alerta. Datos que identifican a una persona en el texto firmable o en el bloque 3
+# (N1-10). Solo con contexto (rótulo, tratamiento, firma, formato AGFA o el mismo nombre en el borrador): un apellido
+# suelto, un epónimo («signo de Murphy», «Bosniak IIF») o la sigla del firmante nunca alertan. La comunicación que el
+# radiólogo dicta (N11) conserva su nombre. Las alertas nunca repiten el dato: lo nombran por su tipo y su línea.
+_MAY = r"[A-ZÁÉÍÓÚÑ]"
+_MIN = r"[a-záéíóúñü]"
+_PAL = _MAY + _MIN + r"+"
+PRIV_ID = r"[A-Z]{0,2}(?:\d{1,3}(?:\.\d{3}){1,3}|\d{6,})(?![\d.,]*\d)"  # cuerpo de un documento: ≥6 cifras o miles con punto («TI 160-180» de RM no)
+PRIV_DOC = re.compile(
+    r"(?i:(?<![\w-])(?:c\.?\s?c\.?|t\.?\s?i\.?|r\.?\s?c\.?|c\.?\s?e\.?|nuip|pasaporte|c[eé]dula(?: de (?:ciudadan[ií]a|extranjer[ií]a))?"
+    r"|tarjeta de identidad|registro civil|documento(?: de identidad)?|identificaci[oó]n|n[uú]mero de identificaci[oó]n)"
+    r"(?![\w-])\s*(?:n[º°o]\.?|no\.|#|:|-)?\s*)" + PRIV_ID)
+PRIV_HC = re.compile(
+    r"(?i)(?<![\w-])(?:historia(?: cl[ií]nica)?|h\.\s?c\.|hc|n[uú]mero de historia|n\.?[º°o]\.? de historia|historia n[º°o]\.?"
+    r"|n[uú]mero de (?:ingreso|admisi[oó]n|estudio|acceso)|accession|episodio)\s*(?:n[º°o]\.?|no\.|#|:|-)?\s*[A-Z]{0,3}\d[\d.\-]{3,}\d")
+PRIV_NUM = re.compile(r"(?<![\w.,/:-])(?:\d{1,3}(?:\.\d{3}){2,}|\d{7,})(?![\w.,/:]*\d)(?!\s*(?:mm|cm|mL|ml|UH|HU|%|kPa|g|kg))")
+PRIV_TEL = re.compile(
+    r"(?i)(?:(?<![\w])(?:tel[eé]fono|tel\.|celular|cel\.|m[oó]vil|whatsapp|contacto)\s*(?:n[º°o]\.?|#|:)?\s*\+?\d[\d \-]{6,}\d"
+    r"|(?<![\d,.x])(?:\+?57[ \-]?)?3\d{2}[ \-]?\d{3}[ \-]?\d{4}(?![\d,]))")
+PRIV_CAMA = re.compile(r"(?i)(?<![\w])(?:cama|habitaci[oó]n|hab\.|cub[ií]culo|camilla)\s*(?:n[º°o]\.?|#|:|-)?\s*\d{1,4}[A-Za-z]?(?![\w])")
+PRIV_NAC = re.compile(
+    r"(?i)(?<![\w])(?:fecha de nacimiento|f\.\s?nac\.?|f\.\s?de\s?nac\.?|nacid[oa] el|naci[oó] el|fdn)(?:\s*:)?"
+    r"(?:\s*\d{1,2}[/.\-]\d{1,2}[/.\-]\d{2,4}|\s+\d{1,2} de [a-z]+ de \d{4})?")
+PRIV_FIRMA = re.compile(
+    r"(?im)^[ \t]*(?:firma(?:do|da)?(?![\wáéíóúñ])(?: electr[oó]nicamente| digitalmente)?(?: por)?\s*:?|m[eé]dic[oa] (?:radi[oó]log[oa]|residente|tratante|que firma)\s*:"
+    r"|radi[oó]log[oa] que firma|registro m[eé]dico|reg\.\s?m[eé]d\.?|r\.\s?m\.\s*(?:n[º°o]\.?)?\s*\d{3,}|tarjeta profesional|t\.\s?p\.\s*\d{3,})")
+PRIV_TRATO = re.compile(
+    r"(?<![\w])(?:Dr|Dra|Doctor|Doctora|Sr|Sra|Srta|Señor|Señora|Señorita|Enf|Lic|Ing)\.?(?:\(a\))?\s+((?:" + _PAL + r"|" + _MAY + r"{2,}(?![\w]))"
+    r"(?:\s+(?:" + _PAL + r"|" + _MAY + r"{2,}(?![\w])))*)")
+PRIV_ROTULO = re.compile(
+    r"(?<![\w])(?i:nombres?(?: del paciente| completo)?|apellidos?|paciente|usuari[oa]|acompañante|madre|padre|familiar|responsable)\s*:\s*"
+    r"(" + _MAY + r"[\wÁÉÍÓÚÑáéíóúñü]+(?:\s+" + _MAY + r"[\wÁÉÍÓÚÑáéíóúñü]+)*)")
+PRIV_EDAD = re.compile(r"(?<![\w])(" + _PAL + r"(?:\s+" + _PAL + r"){1,3}),?\s+(?:de\s+)?\d{1,3}\s+(?:años|meses)(?!\s+de evoluci)")
+PRIV_AGFA = re.compile(r"(?m)^[ \t]*(" + _MAY + r"{3,}(?: " + _MAY + r"{2,}){0,3}, ?" + _MAY + r"{3,}(?: " + _MAY + r"{2,}){0,2})[ \t]*$")
+DEMOGRAFIA = set("paciente femenina femenino masculina masculino mujer hombre varon nino nina lactante recien neonato adulto adulta "
+                 "gestante adolescente escolar preescolar anciano anciana senor senora de la el una un primigestante multigestante".split())
+PRIV_COMUNICA = re.compile(r"(?i)\b(comunicad[oa]s?|se comunic|informad[oa]s? a|se inform|notificad[oa]s? a|se notific|se habl[oó] con|"
+                           r"comentad[oa]s? con|se coment)")
+MEDICAS_MAY = set("TC TAC RM RMN RX ECO ECOGRAFIA ECOGRAFÍA DOPPLER ANGIO ANGIOTC ANGIORM TOMOGRAFIA TOMOGRAFÍA RESONANCIA RADIOGRAFIA "
+                  "RADIOGRAFÍA ABDOMEN PELVIS TORAX TÓRAX CRANEO CRÁNEO CEREBRO CUELLO COLUMNA RODILLA HOMBRO CADERA TOBILLO MUÑECA CODO "
+                  "CON SIN CONTRASTE SIMPLE TOTAL MAGNETICA MAGNÉTICA COMPUTADA COMPUTARIZADA DE DEL Y LA EL LOS LAS HALLAZGOS OPINION "
+                  "OPINIÓN TECNICA TÉCNICA INDICACION INDICACIÓN COMPARACION COMPARACIÓN ESTUDIO DERECHA DERECHO IZQUIERDA IZQUIERDO "
+                  "BILATERAL CONTRASTADO CONTRASTADA PROTOCOLO FASE ARTERIAL VENOSA PORTAL TARDIA TARDÍA URGENCIAS".split())
+# Primeros nombres frecuentes: alertan solo seguidos de un apellido con mayúscula («María Quintero»).
+NOMBRES = set("""juan jose luis carlos jorge andres diego miguel pedro pablo javier alejandro daniel david felipe santiago sebastian
+camilo julian oscar fernando ricardo mauricio hernan gustavo alvaro jaime german fabio edgar hector rafael manuel francisco antonio
+alberto eduardo sergio mario raul hugo ivan wilson nelson freddy jhon john brayan kevin cristian nicolas mateo samuel tomas martin
+emiliano jairo orlando rodrigo victor arturo enrique gabriel esteban alexander leonardo gerardo humberto alfonso ruben ramiro gilberto
+maria ana luz carmen rosa martha marta gloria blanca sandra claudia diana paola patricia andrea carolina catalina natalia juliana
+valentina daniela camila laura sofia isabella mariana gabriela alejandra angela beatriz cecilia esperanza fanny gladys liliana lucia
+margarita mercedes monica nancy olga pilar rocio stella teresa yolanda ximena adriana alba amparo aura elsa elizabeth lorena marcela
+milena nubia sara tatiana viviana yaneth yesenia jennifer lina leidy lady johana erika karen ingrid mary nelly dora ines josefa emilia
+elena victoria clara fernanda antonia manuela salome valeria juana""".split())
+# Epónimos y nombres propios de escalas: nunca son el nombre de una persona del borrador.
+EPONIMOS = set("""joseph mary windermere lady murphy glisson bosniak fleischner couinaud morison douglas hounsfield wirsung santorini vater oddi treitz meckel crohn hodgkin
+wilms graves hashimoto riedel spiegel bochdalek morgagni klatskin mirizzi caroli budd chiari monro silvio sylvio willis galeno rolando
+luschka magendie virchow robin schmorl baker hoffa segond hill sachs bankart bennett lisfranc chopart jones colles smith barton monteggia
+galeazzi salter harris kienbock kienböck perthes osgood schlatter sinding larsen pellegrini stieda haglund morton kager insall salvati hoh
+gleason fazekas lugano deauville kioto kyoto atlanta balthazar tokio stanford debakey wells agatston gartner nabot bartholin skene cowper
+brenner krukenberg meigs sertoli leydig peyronie fournier wilson wernicke korsakoff marchiafava bignami creutzfeldt jakob dandy walker
+arnold blake rathke dorello hirschsprung ladd zenker killian boerhaave mallory weiss barrett schatzki menetrier whipple kerckring cantlie
+rex calot hartmann kupffer rokitansky aschoff heister hamman kerley westermark hampton golden pancoast swyer james poland tietze mondor
+paget cooper waldeyer rouviere troisier ewing codman sudeck charcot brodie garre ollier maffucci gorham jaffe lichtenstein waldt matcuk
+child pugh milan lauren borrmann bismuth strasberg todani amsterdam rome roma tanner fisher hunt hess spetzler martin garden schatzker
+neer weber danis frykman mayo gustilo tscherne pauwels denis magerl anderson levine effendi edwards evans sanders hawkins tile young
+burgess letournel judet ficat steinberg kellgren lawrence outerbridge noyes pfirrmann modic fardon mcrae chamberlain wackenheim powers
+cobb ferguson risser lenke king meyerding""".split())
+
+
+def _plana(s):
+    return "".join(c for c in unicodedata.normalize("NFD", s.lower()) if unicodedata.category(c) != "Mn")
+
+
+def _es_eponimo(w):
+    return _plana(w).strip(".,") in EPONIMOS
+
+
+def _nombre_valido(tokens):
+    """Un candidato a nombre: al menos un token de ≥3 letras que no sea epónimo, rótulo médico ni demografía."""
+    ws = [t for t in tokens if len(t) >= 3]
+    return bool(ws) and not all(_es_eponimo(t) or t.upper() in MEDICAS_MAY or _plana(t) in DEMOGRAFIA for t in ws)
+
+
+def _nombres_en(texto):
+    """[(tipo, tokens, span)] de nombres de persona con contexto en el texto."""
+    out = []
+    for m in PRIV_TRATO.finditer(texto):
+        tk = m.group(1).split()
+        if _nombre_valido(tk):
+            out.append(("nombre de persona", tk, m.group(0)))
+    for m in PRIV_ROTULO.finditer(texto):
+        tk = m.group(1).split()
+        if _plana(tk[0]) not in DEMOGRAFIA and _nombre_valido(tk):
+            out.append(("nombre de persona", tk, m.group(0)))
+    for m in PRIV_EDAD.finditer(texto):
+        tk = m.group(1).split()
+        if _plana(tk[0]) not in DEMOGRAFIA and not any(_es_eponimo(t) for t in tk) and _nombre_valido(tk):
+            out.append(("nombre de persona", tk, m.group(1)))
+    for m in re.finditer(r"(?<![\w])(" + _PAL + r")\s+(" + _PAL + r"(?:\s+" + _PAL + r")?)", texto):
+        if _plana(m.group(1)) in NOMBRES and not _es_eponimo(m.group(2).split()[0]):
+            out.append(("nombre de persona", [m.group(1)] + m.group(2).split(), m.group(0)))
+    for m in PRIV_AGFA.finditer(texto):
+        tk = re.findall(r"\w+", m.group(1))
+        if not any(t in MEDICAS_MAY for t in tk) and _nombre_valido(tk):
+            out.append(("nombre de persona", tk, m.group(1)))
+    return out
+
+
+def _firma_tokens(borrador):
+    """Nombres de las últimas líneas del borrador (firma pegada, Δ-R8 (4)): «Dr./Dra. Apellido» o «Apellidos, Nombres»."""
+    cola = "\n".join([l for l in (borrador or "").splitlines() if l.strip()][-3:])
+    return [t for _, tk, _ in _nombres_en(cola) for t in tk]
+
+
+def privados(texto, borrador=None):
+    """[(tipo, nº de línea, span)] de datos que identifican a una persona en el texto, sin la comunicación dictada (N11)."""
+    out, bp = [], _plana(borrador or "")
+    lineas = texto.splitlines()
+    tok_borr = set()
+    for _, tk, _ in _nombres_en(borrador or ""):
+        tok_borr.update(_plana(t) for t in tk if len(t) >= 3 and not _es_eponimo(t) and t.upper() not in MEDICAS_MAY and _plana(t) not in DEMOGRAFIA)
+    tok_borr.update(_plana(t) for t in _firma_tokens(borrador) if len(t) >= 3 and not _es_eponimo(t))
+    for i, l in enumerate(lineas, 1):
+        comunica = bool(PRIV_COMUNICA.search(l))
+        hall = []
+        for rx, tipo in ((PRIV_DOC, "documento de identidad"), (PRIV_HC, "número de historia"), (PRIV_TEL, "teléfono"),
+                         (PRIV_CAMA, "cama o habitación"), (PRIV_NAC, "fecha de nacimiento"), (PRIV_FIRMA, "firma")):
+            hall += [(tipo, m.group(0)) for m in rx.finditer(l)]
+        if not any(t == "documento de identidad" or t == "número de historia" or t == "teléfono" for t, _ in hall):
+            hall += [("documento de identidad", m.group(0)) for m in PRIV_NUM.finditer(l)
+                     if not re.search(r"(?i)(pmid|doi|isbn|issn|nct)\W{0,3}$", l[max(0, m.start() - 8):m.start()])]
+        for tipo, tk, span in _nombres_en(l):
+            if comunica and all(_plana(t) in bp for t in tk if len(t) >= 3):
+                continue  # N11: la comunicación que el radiólogo dictó, con su nombre
+            hall.append((tipo, span))
+        for w in re.findall(r"[\wÁÉÍÓÚÑáéíóúñü]{3,}", l):
+            if _plana(w) in tok_borr and (w[0].isupper()) and not (comunica and _plana(w) in bp) and not any(w in s for _, s in hall):
+                hall.append(("nombre de persona", w))
+        out += [(t, i, s) for t, s in hall]
+    return out
+
+
+def chequear_privacidad(texto, borrador, donde):
+    """Alertas PRIVACIDAD (una por tipo y línea) y los spans a enmascarar en las demás alertas."""
+    al, spans = [], []
+    for tipo, i, s in privados(texto or "", borrador):
+        a = f"PRIVACIDAD · {tipo} en el {donde}, línea {i}: quítalo; nunca entra al informe ni a la respuesta (N1-10)"
+        if a not in al:
+            al.append(a)
+        spans.append(s)
+    return al, spans
+
+
+def enmascarar(texto, spans):
+    """Las demás alertas citan el bloque 1: el dato personal sale como «‹dato personal›»."""
+    for s in sorted(set(x for x in spans if x and x.strip()), key=len, reverse=True):
+        texto = texto.replace(s, "‹dato personal›")
+    return texto
+
+
+
 def norm(s):
     return unicodedata.normalize("NFC", s)
 
@@ -232,11 +406,46 @@ def negaciones(texto):
     return len(re.findall(r"\bNEG\b", t))
 
 
-def chequear_opinion(opin, hall, pref=""):
-    """Chequeos de una Opinión (v1.9: se corre una vez por Opinión; con /alt, prefijo [sobria] / [asertiva])."""
+# v2.0 (D-221): umbrales por nivel de extensión (N6b): 1 conciso · 2 neutro · 3 extenso
+EXTENSION = {1: {"oracion": 20, "oraciones": None, "idea1": 20, "otras": 20, "ideas": 3},
+             2: {"oracion": 30, "oraciones": 3, "idea1": 35, "otras": 50, "ideas": 4},
+             3: {"oracion": 40, "oraciones": 4, "idea1": 50, "otras": 50, "ideas": 5}}
+
+
+def palabras(s):
+    """v2.0: palabras de contenido para los topes de extensión: sin la etiqueta «Estructura:», cifras, unidades ni la «x» de las medidas."""
+    s = re.sub(r"^[^:\n]{1,30}:\s*", "", s.strip())
+    return len([w for w in re.findall(r"[^\W\d_]+", s) if w.lower() not in ("x", "mm", "cm", "ml", "mm2", "s", "uh")])
+
+
+def chequear_extension(hall, n):
+    """v2.0: palabras por oración y oraciones por hallazgo (una línea = un hallazgo) en Hallazgos, según el nivel."""
+    alertas, e = [], EXTENSION[n]
+    for linea in hall.splitlines():
+        l = re.sub(r"\[[^\]]*\]", "", linea).strip()
+        if not re.search(r"\w", l) or ROTULO_OPINION.match(l):
+            continue
+        frases = [f for f in re.split(r"(?<=[.;])\s+", l) if re.search(r"\w", f)]
+        for f in frases:
+            k = palabras(f)
+            if k > e["oracion"]:
+                alertas.append(f"EXTENSIÓN {n} · oración de {k} palabras en Hallazgos (≤{e['oracion']} en este nivel) · «{f[:50]}…»")
+        if e["oraciones"] and len(frases) > e["oraciones"]:
+            alertas.append(f"EXTENSIÓN {n} · hallazgo en {len(frases)} oraciones (≤{e['oraciones']} en este nivel) · «{l[:50]}…»")
+    return alertas
+
+
+def chequear_opinion(opin, hall, pref="", extension=None):
+    """Chequeos de una Opinión (v1.9: se corre una vez por Opinión; con /alt, prefijo [sobria] / [asertiva]).
+    v2.0: con «extension», los topes de ideas y de palabras salen de EXTENSION (la recomendación «Se sugiere…» no cuenta)."""
     alertas = []
     ideas = ideas_de(opin)
-    if len(ideas) > 5:  # v1.9: ideas ≤ procesos; antes, tope 3–4
+    e = EXTENSION.get(extension)
+    if e:
+        n_ideas = len([i for i in ideas if not re.match(r"(\d+[.)]\s*)?se sugiere\b", " ".join(i).strip(), re.I)])
+        if n_ideas > e["ideas"]:
+            alertas.append(f"{pref}EXTENSIÓN {extension} · {n_ideas} ideas en la Opinión (≤{e['ideas']} en este nivel; ideas ≤ procesos, N7)")
+    elif len(ideas) > 5:  # v1.9: ideas ≤ procesos; antes, tope 3–4
         alertas.append(f"{pref}OPINIÓN · {len(ideas)} ideas: ¿cada una es un proceso distinto? (N7: ideas ≤ procesos)")
     frases_hall = {f for f in frases_norm(hall) if len(f.split()) >= 8}
     for k, lineas in enumerate(ideas):
@@ -256,7 +465,13 @@ def chequear_opinion(opin, hall, pref=""):
             alertas.append(f"{pref}OPINIÓN · medida en la Opinión (solo si el tamaño ES el criterio o es excepción del delta) · «{m.group(0)}»")
         n = len(cuerpo.split())
         tope = 100 if k == 0 else 50  # v1.9: guía idea 1 ≈60 y el resto cortas; el tope es una señal
-        if n > tope:
+        if e and not re.match(r"(\d+[.)]\s*)?se sugiere\b", cuerpo.strip(), re.I):
+            tope_e, n_e = (e["idea1"] if k == 0 else e["otras"]), palabras(texto)
+            if n_e > tope_e:
+                alertas.append(f"{pref}EXTENSIÓN {extension} · idea {k + 1} de {n_e} palabras (≤{tope_e} en este nivel) · «{cuerpo[:50]}…»")
+        elif e:
+            pass
+        elif n > tope:
             alertas.append(f"{pref}OPINIÓN · idea de {n} palabras (guía: idea 1 ≈60, el resto cortas; es una señal, no un tope) · «{cuerpo[:50]}…»")
         # v1.9 · N7: la respuesta, no el descriptor ni el contexto
         respuesta = plano(CONTEXTO.sub(" ", texto))
@@ -279,10 +494,69 @@ def chequear_opinion(opin, hall, pref=""):
     return alertas
 
 
-def verificar(salida, borrador=None):
-    """Devuelve la lista de alertas (sin duplicados, en orden) del bloque 1 propuesto."""
+CERTEZAS = ("consistente con", "menos probable", "improbable", "probablemente", "probable", "sospechos", "sugestiv", "posible", "indeterminad")
+CLINICO = re.compile(r"\b(edad|anos|antecedente|clinic|sintoma|fiebre|dolor|laboratorio|leucocit|pcr|bilirrubin|creatinin|hcg|"
+                     r"embaraz|historia|tratamiento|quimioterapia|cirugia previa|estudio previo|previo|comparacion|antiguedad)", re.I)
+VACIAS_F = set("faltó falto para sobre entre desde hasta como cual cuál cuales donde tiene tienen está están esta este estos estas otra otro".split())
+
+
+def falto_elementos(b3):
+    """v2.1: elementos de la línea «Faltó: ¿…?» del bloque 3 (coma, punto y coma, «·», «¿…?» separados, y el último «y»)."""
+    m = re.search(r"Falt[oó][^:]*:\s*(.+)", b3 or "")
+    if not m:
+        return []
+    cuerpo = re.split(r"\n", m.group(1))[0]
+    partes = [x for x in re.split(r"[,;·]|\?\s*¿", cuerpo) if x.strip(" ¿?.")]
+    if partes:
+        partes[-1:] = [x for x in re.split(r"\s+y\s+", partes[-1]) if x.strip(" ¿?.")]
+    return [x.strip(" ¿?.") for x in partes]
+
+
+def chequear_bloque3(b3, salida, borrador):
+    """v2.1 (r16): el filtro del «Faltó» y el «Llamar» = Opinión."""
+    al, bp = [], plano(borrador or "")
+    els = falto_elementos(b3)
+    if len(els) > 3:
+        al.append(f"FALTO-N · el «Faltó» trae {len(els)} elementos: deja ≤3, los que cambian el manejo de hoy o la categoría (N6)")
+    for e in els:
+        if CLINICO.search(plano(e)):
+            al.append(f"FALTO-CLINICO · «{e}» no se ve en la imagen (clínica, antecedente, edad o previo): fuera del «Faltó» (N6)")
+            continue
+        ws = [w for w in re.findall(r"[a-z]{4,}", plano(e)) if w not in VACIAS_F]
+        if bp and ws and all(w[:5] in bp for w in ws):
+            al.append(f"FALTO-DICTADO · «{e}» ya está dictado (o su sinónimo): fuera del «Faltó» (N6)")
+    _, ops = opiniones(salida)
+    ideas = [" ".join(i) for _, o in ops for i in ideas_de(o)]
+    for l in (b3 or "").splitlines():
+        m = re.search(r"Llamar\s*:\s*([^·\n]+)", l)
+        if not m or not ideas:
+            continue
+        ll = plano(m.group(1))
+        ws = set(re.findall(r"[a-z]{5,}", ll))
+        idea = max(ideas, key=lambda i: len(ws & set(re.findall(r"[a-z]{5,}", plano(i)))))
+        ci, cl = {c for c in CERTEZAS if c in plano(idea)}, {c for c in CERTEZAS if c in ll}
+        if ci != cl:
+            al.append(f"LLAMAR-CERTEZA · «Llamar: {m.group(1).strip()}» debe copiar el diagnóstico y el término de certeza de su idea de la Opinión (N11)")
+    return al
+
+
+def verificar(salida, borrador=None, extension=None, bloque3=None):
+    """Devuelve la lista de alertas (sin duplicados, en orden) del bloque 1 propuesto. v2.0: extension 1|2|3 (N6b) o None (= v1.9).
+    v2.1: bloque3 (texto del bloque 3) añade FALTO-* y LLAMAR-CERTEZA; con borrador, OPI-NUM1."""
+    extension = int(extension) if extension else None
     salida = norm(salida)
     borrador = norm(borrador) if borrador is not None else None
+    # v2.2 (M0 · P4): PRIVACIDAD primero; el dato se enmascara antes de los demás chequeos, que así nunca lo repiten
+    priv, spans = chequear_privacidad(salida, borrador, "bloque 1")
+    if bloque3:
+        bloque3 = norm(bloque3)
+        p3, s3 = chequear_privacidad(bloque3, borrador, "bloque 3")
+        priv, spans = priv + p3, spans + s3
+    spans += [s for _, _, s in privados(borrador or "")]
+    verificar.privados = spans
+    salida = enmascarar(salida, spans)
+    borrador = enmascarar(borrador, spans) if borrador is not None else None
+    bloque3 = enmascarar(bloque3, spans) if bloque3 else bloque3
     alertas = []
     hall, lista_opin = opiniones(salida)
 
@@ -337,7 +611,7 @@ def verificar(salida, borrador=None):
             break
 
     # v1.7: voz narrativa
-    for m in NOMINAL.finditer(salida):
+    for m in NOMINAL.finditer(salida if extension != 1 else "\n".join(t for _, t in lista_opin)):  # v2.0: con 1, línea nominal en Hallazgos
         alertas.append(f"VOZ · sustantivo tras coma donde va un verbo («que comprime», «que desplaza»; nunca un verbo más fuerte que el dictado) · «{m.group(0).strip(', ')}»")
     for m in RELLENO.finditer(salida):
         alertas.append(f"VOZ · relleno («a nivel de» → «en»; los demás se eliminan), salvo texto fijo de plantilla · «{m.group(0)}»")
@@ -348,7 +622,9 @@ def verificar(salida, borrador=None):
             alertas.append(f"PROCEDIMIENTO · fuera de la forma «Se sugiere [procedimiento] guiado por [modalidad] para [objetivo].»: si es dictado, conserva la intención y decláralo; si es tuyo, solo con respaldo de un archivo cargado (N9) · «{frase.strip()[:70]}»")
 
     for etiqueta, opin in lista_opin:  # v1.9: con /alt, cada Opinión por separado y con prefijo
-        alertas += chequear_opinion(opin, hall, f"[{etiqueta}] " if etiqueta else "")
+        alertas += chequear_opinion(opin, hall, f"[{etiqueta}] " if etiqueta else "", extension)
+    if extension in EXTENSION:
+        alertas += chequear_extension(hall, extension)
 
     if borrador is not None:
         nb, ns = numeros(borrador), numeros(salida)
@@ -366,9 +642,16 @@ def verificar(salida, borrador=None):
         neg_s = negaciones(hall)
         if neg_s > neg_b:
             alertas.append(f"NEGACIÓN · la salida tiene {neg_s - neg_b} negación(es) más que el borrador: confirma que ninguna es un negativo no dictado")
+        _, ob = opiniones(borrador)
+        for etiqueta, opin in lista_opin:  # v2.1 (r16): una sola idea sin «1.», salvo que el borrador numere (la huella o E: decláralo)
+            ids = ideas_de(opin)
+            if len(ids) == 1 and re.match(r"1[.)]\s", ids[0][0]) and not any(re.search(r"(?m)^\s*1[.)]\s", o) for _, o in ob):
+                alertas.append(f"{'[' + etiqueta + '] ' if etiqueta else ''}OPI-NUM1 · una sola idea va sin «1.» (N7), salvo que el borrador, la huella o la sección E numeren")
+    if bloque3:
+        alertas += chequear_bloque3(bloque3, salida, borrador)
 
     vistos = []
-    for a in alertas:
+    for a in priv + [enmascarar(x, spans) for x in alertas]:
         if a not in vistos:
             vistos.append(a)
     return vistos
@@ -378,9 +661,18 @@ def main():
     if len(sys.argv) < 2:
         print(__doc__.split("\nHistorial")[0])
         return
-    salida = open(sys.argv[1], encoding="utf-8").read()
-    borrador = open(sys.argv[2], encoding="utf-8").read() if len(sys.argv) > 2 else None
-    vistos = verificar(salida, borrador)
+    args, ext = list(sys.argv[1:]), None
+    if "--extension" in args:  # v2.0 (D-221)
+        i = args.index("--extension"); ext = args[i + 1]; del args[i:i + 2]
+        if ext not in ("1", "2", "3"):
+            print("--extension: 1 (conciso), 2 (neutro) o 3 (extenso)", file=sys.stderr)
+            sys.exit(2)
+    b3 = None
+    if "--bloque3" in args:  # v2.1 (r16)
+        i = args.index("--bloque3"); b3 = open(args[i + 1], encoding="utf-8").read(); del args[i:i + 2]
+    salida = open(args[0], encoding="utf-8").read()
+    borrador = open(args[1], encoding="utf-8").read() if len(args) > 1 else None
+    vistos = verificar(salida, borrador, ext, b3)
     if vistos:
         print(f"ALERTAS · {len(vistos)}")
         print("\n".join(vistos))

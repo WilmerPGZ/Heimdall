@@ -8,7 +8,7 @@
     {
       "name": "radiologia-informes",
       "source": "./plugins/radiologia-informes",
-      "description": "Verificador determinista del informe y Fábrica de KB con su linter."
+      "description": "Verificador determinista del informe (con privacidad), pruebas de regresión y léxico VESPER."
     }
   ]
 }

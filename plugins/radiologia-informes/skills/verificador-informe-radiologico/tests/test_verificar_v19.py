@@ -408,7 +408,7 @@ class Cli(unittest.TestCase):
     def test_uso_sin_argumentos(self):
         r = subprocess.run([sys.executable, SCRIPT], capture_output=True, text=True, encoding="utf-8")
         self.assertEqual(r.returncode, 0)
-        self.assertIn("v1.9 (2026-10-11)", r.stdout)
+        self.assertIn("v2.2 (2026-10-22)", r.stdout)
         self.assertIn("Uso:", r.stdout)
         self.assertNotIn("Historial", r.stdout)
 
@@ -423,7 +423,7 @@ class Cli(unittest.TestCase):
         m = re.search(r"^#BEGIN_SCRIPT\n(.*?)^#END_SCRIPT$", texto, re.S | re.M)
         self.assertIsNotNone(m)
         self.assertEqual(m.group(1), script)
-        self.assertIn("v1.9 (2026-10-11)", texto.split("#BEGIN_SCRIPT")[0])
+        self.assertIn("v2.2 (2026-10-22)", texto.split("#BEGIN_SCRIPT")[0])
 
 
 if __name__ == "__main__":
